@@ -124,6 +124,7 @@ pub struct ProviderMarket {
 
     /// Infinite tasks requiring to be killed on shutdown.
     handles: HashMap<String, SpawnHandle>,
+    agent: Option<Addr<crate::provider_agent::ProviderAgent>>,
 }
 
 #[derive(Clone)]
@@ -154,6 +155,7 @@ impl ProviderMarket {
             agreement_signed_signal: SignalSlot::<NewAgreement>::default(),
             agreement_terminated_signal: SignalSlot::<CloseAgreement>::default(),
             handles: HashMap::new(),
+            agent: None,
         }
     }
 
@@ -952,6 +954,39 @@ impl From<AgreementClosed> for AgreementFinalized {
         AgreementFinalized {
             id: msg.agreement_id,
             result,
+        }
+    }
+}
+
+#[derive(actix::Message)]
+#[rtype(result = "anyhow::Result<()>")]
+pub struct MarketUpdatePricing {
+    pub scalar: f64,
+}
+
+// We will store the Addr<ProviderAgent> in ProviderMarket when we initialize it, or we can just pass the Event::PresetsChanged back via some channel.
+
+#[derive(actix::Message)]
+#[rtype(result = "()")]
+pub struct SetAgent(pub Addr<crate::provider_agent::ProviderAgent>);
+
+impl Handler<SetAgent> for ProviderMarket {
+    type Result = ();
+    fn handle(&mut self, msg: SetAgent, _ctx: &mut Context<Self>) {
+        self.agent = Some(msg.0);
+    }
+}
+
+impl Handler<MarketUpdatePricing> for ProviderMarket {
+    type Result = anyhow::Result<()>;
+    fn handle(&mut self, msg: MarketUpdatePricing, _ctx: &mut Context<Self>) -> Self::Result {
+        if let Some(agent) = &self.agent {
+            agent.do_send(crate::provider_agent::UpdatePricing { scalar: msg.scalar });
+            Ok(())
+        } else {
+            Err(anyhow!(
+                "cannot update pricing: provider agent is not set yet"
+            ))
         }
     }
 }
