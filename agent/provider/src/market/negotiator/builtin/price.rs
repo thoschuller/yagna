@@ -96,21 +96,9 @@ impl NegotiatorComponent for PriceNego {
                         if let Some(s) = scalar {
                             self.last_update = std::time::Instant::now();
 
-                            // Since ProviderAgent handles UpdatePricing, we need to send it to ProviderAgent.
-                            // However, ProviderAgent spawned ProviderMarket, not the other way around.
-                            // But actually, we can add a simple channel or just rely on actix System Registry if we registered it.
-                            // Another way: ProviderAgent can be reached via `System::current().registry().get::<ProviderAgent>()` ONLY IF it's a SystemService.
-                            // A quick hack since we can't easily change the whole architecture:
-                            // The easiest way is to add UpdatePricing to `ProviderMarket` and have it forward to `ProviderAgent` (we'd need `ProviderMarket` to have `Addr<ProviderAgent>`),
-                            // or better, `ProviderMarket` can handle it directly! Let's just modify the macro to send it to the ProviderMarket, and we will implement UpdatePricing for ProviderMarket.
-                            // BUT WAIT, we already implemented `UpdatePricing` on `ProviderAgent`.
-                            // So let's send it to `ProviderMarket`, and `ProviderMarket` will handle it by... we didn't add it to ProviderMarket yet.
-                            // Let's implement `UpdatePricing` on `ProviderMarket` instead, because `ProviderMarket` owns `subscriptions` and `config`, but wait, PresetManager is in `ProviderAgent`.
-
-                            // Let's use actix::Arbiter::current().spawn to emit a global event, or just implement a global channel.
-                            // Let's just use `lazy_static` to hold a global channel sender, or add `Addr<ProviderAgent>` to `ProviderMarket`.
-
-                            // Actually, I can just use a channel!
+                            // Send pricing updates to ProviderMarket because this negotiator holds its
+                            // address; ProviderMarket then forwards or applies the update in the
+                            // provider-side market flow.
                             self.market.do_send(
                                 crate::market::provider_market::MarketUpdatePricing { scalar: s },
                             );
