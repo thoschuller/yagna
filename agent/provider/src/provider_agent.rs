@@ -395,6 +395,8 @@ impl Actor for ProviderAgent {
 
     fn started(&mut self, ctx: &mut Context<Self>) {
         let runner = self.runner.clone();
+        self.market
+            .do_send(crate::market::provider_market::SetAgent(ctx.address()));
         ctx.spawn(process_activity_events(runner).into_actor(self));
     }
 }
@@ -640,5 +642,75 @@ mod tests {
             offer_template,
             exeunit_desc,
         }
+    }
+}
+
+#[derive(actix::Message)]
+#[rtype(result = "anyhow::Result<()>")]
+pub struct UpdatePricing {
+    pub scalar: f64,
+}
+
+impl Handler<UpdatePricing> for ProviderAgent {
+    type Result = anyhow::Result<()>;
+
+    fn handle(&mut self, msg: UpdatePricing, ctx: &mut Context<Self>) -> Self::Result {
+        log::info!("Updating pricing with scalar: {}", msg.scalar);
+
+        // 1. Get the presets
+        let mut state = self.presets.state.lock().unwrap();
+
+        let mut updated = std::collections::HashSet::new();
+        let mut cloned_presets = state.clone();
+
+        for preset_name in &cloned_presets.active {
+            if let Some(preset) = cloned_presets.presets.get_mut(preset_name) {
+                // Apply scalar to the properties
+                if let Some(coeffs) = preset
+                    .usage_coeffs
+                    .get_mut("golem.com.pricing.model.linear.coeffs")
+                {
+                    *coeffs *= msg.scalar;
+                } else {
+                    for (_k, v) in preset.usage_coeffs.iter_mut() {
+                        *v *= msg.scalar;
+                    }
+                }
+
+                preset.initial_price *= msg.scalar;
+
+                updated.insert(preset_name.clone());
+            }
+        }
+
+        if updated.is_empty() {
+            return Ok(());
+        }
+
+        *state = cloned_presets;
+
+        // Let the ProviderMarket know that things changed.
+
+        // In order to send this properly without directly changing everything via Event sender,
+        // we can just directly trigger the updates by executing what `PresetsChanged` does:
+        // Actually, the sender channel is managed by PresetManager.
+        // Wait, `ProviderAgent` itself handles `PresetsChanged` in the `Initialize` stream!
+        // A better way is to do it directly:
+
+        let new_names = state.active.clone();
+        let market = self.market.clone();
+        let agent = ctx.address();
+
+        let f = async move {
+            log::info!("Hot-swapping Market Offers due to dynamic price change");
+            let _ = market.send(Unsubscribe(OfferKind::Any)).await;
+            let _ = agent
+                .send(CreateOffers(OfferKind::WithPresets(new_names)))
+                .await;
+        };
+
+        ctx.spawn(actix::fut::wrap_future(f));
+
+        Ok(())
     }
 }

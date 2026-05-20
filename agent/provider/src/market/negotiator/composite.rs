@@ -74,7 +74,10 @@ impl CompositeNegotiator {
             )
             .add_component(
                 "Price",
-                Box::new(PriceNego::new(&config.expire_agreements_config)?),
+                Box::new(PriceNego::new(
+                    _market.clone(),
+                    &config.expire_agreements_config,
+                )?),
             );
 
         Ok(CompositeNegotiator { components })
