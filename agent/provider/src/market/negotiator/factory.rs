@@ -64,6 +64,12 @@ pub struct PaymentTimeoutConfig {
 
 /// Configuration for LimitAgreements Negotiator.
 #[derive(StructOpt, Clone, Debug)]
+pub struct PriceNegotiatorConfig {
+    #[structopt(long, env, default_value = "0.006")]
+    pub min_price: f64,
+}
+
+#[derive(StructOpt, Clone, Debug)]
 pub struct CompositeNegotiatorConfig {
     #[structopt(flatten)]
     pub validation_config: DemandValidationNegotiatorConfig,
@@ -77,6 +83,8 @@ pub struct CompositeNegotiatorConfig {
     pub payment_timeout_config: PaymentTimeoutConfig,
     #[structopt(flatten)]
     pub policy_config: PolicyConfig,
+    #[structopt(flatten)]
+    pub price_config: PriceNegotiatorConfig,
 }
 
 #[derive(StructOpt, Clone, Debug)]
