@@ -1,4 +1,4 @@
-use crate::market::negotiator::factory::AgreementExpirationNegotiatorConfig;
+use crate::market::negotiator::factory::PriceNegotiatorConfig;
 use crate::market::negotiator::{NegotiationResult, NegotiatorComponent, ProposalView};
 use actix::Addr;
 
@@ -6,6 +6,7 @@ pub struct PriceNego {
     market: Addr<crate::market::provider_market::ProviderMarket>,
     history: std::collections::VecDeque<f64>,
     last_update: std::time::Instant,
+    min_price: f64,
 }
 
 static PRICE_PROPERTY: &str = "/golem/com/pricing/model/linear/coeffs";
@@ -14,12 +15,13 @@ static THREADS_PROPERTY: &str = "/golem/inf/cpu/threads";
 impl PriceNego {
     pub fn new(
         market: Addr<crate::market::provider_market::ProviderMarket>,
-        _config: &AgreementExpirationNegotiatorConfig,
+        config: &PriceNegotiatorConfig,
     ) -> anyhow::Result<Self> {
         Ok(PriceNego {
             market,
             history: std::collections::VecDeque::new(),
             last_update: std::time::Instant::now() - std::time::Duration::from_secs(15 * 60), // Allow immediate update
+            min_price: config.min_price,
         })
     }
 }
@@ -75,7 +77,7 @@ impl NegotiatorComponent for PriceNego {
                             let mut test_scalar = 1.0 - (1.0 - median / p_normalized_offer) / 2.0;
 
                             // Enforce Floor
-                            let p_floor = 0.006;
+                            let p_floor = self.min_price;
                             // 1-thread baseline
                             if (offer_cpu * test_scalar * 1.0) + (offer_env * test_scalar)
                                 >= p_floor
