@@ -982,11 +982,7 @@ impl Handler<MarketUpdatePricing> for ProviderMarket {
     fn handle(&mut self, msg: MarketUpdatePricing, _ctx: &mut Context<Self>) -> Self::Result {
         if let Some(agent) = &self.agent {
             agent.do_send(crate::provider_agent::UpdatePricing { scalar: msg.scalar });
-            Ok(())
-        } else {
-            Err(anyhow!(
-                "cannot update pricing: provider agent is not set yet"
-            ))
         }
+        Ok(())
     }
 }

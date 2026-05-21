@@ -703,37 +703,10 @@ impl Handler<UpdatePricing> for ProviderAgent {
 
         let f = async move {
             log::info!("Hot-swapping Market Offers due to dynamic price change");
-
-            match market.send(Unsubscribe(OfferKind::Any)).await {
-                Ok(Ok(())) => {}
-                Ok(Err(err)) => {
-                    log::error!(
-                        "Failed to unsubscribe market offers during dynamic pricing refresh: {err}"
-                    );
-                }
-                Err(err) => {
-                    log::error!(
-                        "Failed to send Unsubscribe to market during dynamic pricing refresh: {err}"
-                    );
-                }
-            }
-
-            match agent
+            let _ = market.send(Unsubscribe(OfferKind::Any)).await;
+            let _ = agent
                 .send(CreateOffers(OfferKind::WithPresets(new_names)))
-                .await
-            {
-                Ok(Ok(())) => {}
-                Ok(Err(err)) => {
-                    log::error!(
-                        "Failed to create offers during dynamic pricing refresh: {err}"
-                    );
-                }
-                Err(err) => {
-                    log::error!(
-                        "Failed to send CreateOffers to provider agent during dynamic pricing refresh: {err}"
-                    );
-                }
-            }
+                .await;
         };
 
         ctx.spawn(actix::fut::wrap_future(f));
