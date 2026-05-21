@@ -1,0 +1,3 @@
+[submodule "dashboard-src"]
+	path = dashboard-src
+	url = https://github.com/scx1332/yagna-dashboard.git
