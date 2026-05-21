@@ -724,9 +724,7 @@ impl Handler<UpdatePricing> for ProviderAgent {
             {
                 Ok(Ok(())) => {}
                 Ok(Err(err)) => {
-                    log::error!(
-                        "Failed to create offers during dynamic pricing refresh: {err}"
-                    );
+                    log::error!("Failed to create offers during dynamic pricing refresh: {err}");
                 }
                 Err(err) => {
                     log::error!(
